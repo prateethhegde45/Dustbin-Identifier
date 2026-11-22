@@ -8,6 +8,182 @@ const mapContainerStyle = { width: "100%", height: "400px", borderRadius: "12px"
 const defaultCenter = { lat: 12.9716, lng: 77.5946 };
 
 /* ============================================================
+   WISE CITIZEN REWARD HELPER
+   ============================================================ */
+/* ============================================================
+   WISE CITIZEN REWARDS CARD (WITH REDEEM & 10-DIGIT CODE)
+   ============================================================ */
+function RewardsCard({ user, onRefresh }) {
+  const points = user?.points || 0;
+  const reward = getRewardInfo(points);
+  const [redeeming, setRedeeming] = useState(false);
+  const [latestCode, setLatestCode] = useState(null);
+
+  const handleRedeem = async (tier) => {
+    setRedeeming(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(API + "/rewards/redeem", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: "Bearer " + token } : {}),
+        },
+        body: JSON.stringify({ tier }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setLatestCode({ code: data.code, discount: data.discount });
+        alert(`🎉 Redeemed! Your ${data.discount}% discount code is: ${data.code}`);
+        onRefresh();
+      } else {
+        alert(data.message || "Failed to redeem discount");
+      }
+    } catch (err) {
+      alert("Redeem failed: " + err.message);
+    }
+    setRedeeming(false);
+  };
+
+  const copyCode = (code) => {
+    navigator.clipboard.writeText(code);
+    alert("📋 Copied code: " + code);
+  };
+
+  return (
+    <div className="section-card" style={{ borderLeft: "4px solid #f59e0b" }}>
+      <div className="section-header" style={{ marginBottom: 10 }}>
+        <h3>🏅 Wise Citizen Rewards</h3>
+        <span
+          className="badge"
+          style={{
+            background: reward.discount > 0 ? "#e8f5e9" : "#f3f4f6",
+            color: reward.discount > 0 ? "#2e7d32" : "#555",
+            fontWeight: 600,
+            padding: "4px 12px",
+            borderRadius: 12,
+          }}
+        >
+          {reward.discount > 0 ? `🎉 ${reward.discount}% Discount Ready` : "Earn 10 pts per verified report"}
+        </span>
+      </div>
+
+      <p style={{ margin: "4px 0 10px", fontSize: 14, color: "#444" }}>
+        You have <strong>{points} Wise Citizen Points</strong>.{" "}
+        {reward.nextTarget ? (
+          <>
+            Need <strong>{reward.nextTarget - points} more points</strong> to unlock{" "}
+            <strong>{reward.nextDiscount}% discount</strong>.
+          </>
+        ) : (
+          <>You have unlocked the maximum <strong>30% discount</strong> tier!</>
+        )}
+      </p>
+
+      {/* Progress Bar */}
+      <div style={{ background: "#e5e7eb", borderRadius: 8, height: 10, overflow: "hidden", marginBottom: 10 }}>
+        <div
+          style={{
+            width: `${reward.progress}%`,
+            height: "100%",
+            background: reward.discount >= 30 ? "#2e7d32" : reward.discount >= 10 ? "#10b981" : "#f59e0b",
+            transition: "width 0.3s ease",
+          }}
+        />
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#666", marginBottom: 14 }}>
+        <span>0 pts</span>
+        <span style={{ fontWeight: points >= 100 ? 700 : 400, color: points >= 100 ? "#2e7d32" : "#666" }}>
+          100 pts → 10% OFF {points >= 100 ? "✅" : ""}
+        </span>
+        <span style={{ fontWeight: points >= 200 ? 700 : 400, color: points >= 200 ? "#2e7d32" : "#666" }}>
+          200 pts → 30% OFF {points >= 200 ? "✅" : ""}
+        </span>
+      </div>
+
+      {/* Redeem Buttons */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        <button
+          className="btn btn-success btn-small"
+          disabled={points < 100 || redeeming}
+          onClick={() => handleRedeem(100)}
+        >
+          🎟️ Redeem 10% OFF (100 pts)
+        </button>
+        <button
+          className="btn btn-primary btn-small"
+          disabled={points < 200 || redeeming}
+          onClick={() => handleRedeem(200)}
+        >
+          🎟️ Redeem 30% OFF (200 pts)
+        </button>
+      </div>
+
+      {/* Newly Generated Code */}
+      {latestCode && (
+        <div
+          style={{
+            background: "#e8f5e9",
+            border: "1px dashed #2e7d32",
+            borderRadius: 8,
+            padding: "10px 14px",
+            marginBottom: 12,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 12, color: "#2e7d32", fontWeight: 600 }}>
+              🎉 {latestCode.discount}% Discount Referral Code
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: 2, color: "#1b5e20" }}>
+              {latestCode.code}
+            </div>
+          </div>
+          <button className="btn btn-outline btn-small" onClick={() => copyCode(latestCode.code)}>
+            📋 Copy
+          </button>
+        </div>
+      )}
+
+      {/* Past Redeemed Codes */}
+      {user?.redeemedCodes?.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 6px", color: "#555" }}>
+            Your Redeemed Codes:
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {user.redeemedCodes.map((item, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: "#f9fafb",
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                  fontSize: 13,
+                }}
+              >
+                <span>
+                  <strong style={{ letterSpacing: 1 }}>{item.code}</strong> — {item.discount}% OFF
+                </span>
+                <button className="btn btn-outline btn-small" onClick={() => copyCode(item.code)}>
+                  📋 Copy
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
    GOOGLE MAP COMPONENT
    ============================================================ */
 function DustbinMap({ dustbins, userLocation }) {
@@ -81,6 +257,67 @@ function StatCard({ icon, label, value, color }) {
       <div>
         <div className="stat-value">{value}</div>
         <div className="stat-label">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   WISE CITIZEN REWARDS CARD
+   ============================================================ */
+function RewardsCard({ points = 0 }) {
+  const reward = getRewardInfo(points);
+
+  return (
+    <div className="section-card" style={{ borderLeft: "4px solid #f59e0b" }}>
+      <div className="section-header" style={{ marginBottom: 10 }}>
+        <h3>🏅 Wise Citizen Rewards</h3>
+        <span
+          className="badge"
+          style={{
+            background: reward.discount > 0 ? "#e8f5e9" : "#f3f4f6",
+            color: reward.discount > 0 ? "#2e7d32" : "#555",
+            fontWeight: 600,
+            padding: "4px 12px",
+            borderRadius: 12,
+          }}
+        >
+          {reward.discount > 0 ? `🎉 ${reward.discount}% Discount Active` : "Earn 10 pts per verified report"}
+        </span>
+      </div>
+
+      <p style={{ margin: "4px 0 10px", fontSize: 14, color: "#444" }}>
+        You have <strong>{points} Wise Citizen Points</strong>.{" "}
+        {reward.nextTarget ? (
+          <>
+            Need <strong>{reward.nextTarget - points} more points</strong> to unlock{" "}
+            <strong>{reward.nextDiscount}% discount</strong>.
+          </>
+        ) : (
+          <>You have unlocked the maximum <strong>30% discount</strong> tier!</>
+        )}
+      </p>
+
+      {/* Progress Bar */}
+      <div style={{ background: "#e5e7eb", borderRadius: 8, height: 10, overflow: "hidden", marginBottom: 10 }}>
+        <div
+          style={{
+            width: `${reward.progress}%`,
+            height: "100%",
+            background: reward.discount >= 30 ? "#2e7d32" : reward.discount >= 10 ? "#10b981" : "#f59e0b",
+            transition: "width 0.3s ease",
+          }}
+        />
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#666" }}>
+        <span>0 pts</span>
+        <span style={{ fontWeight: points >= 100 ? 700 : 400, color: points >= 100 ? "#2e7d32" : "#666" }}>
+          100 pts → 10% OFF {points >= 100 ? "✅" : ""}
+        </span>
+        <span style={{ fontWeight: points >= 200 ? 700 : 400, color: points >= 200 ? "#2e7d32" : "#666" }}>
+          200 pts → 30% OFF {points >= 200 ? "✅" : ""}
+        </span>
       </div>
     </div>
   );
@@ -315,8 +552,11 @@ function ReportModal({ dustbin, onSubmit, onClose }) {
     <div className="modal-bg" onClick={onClose}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <h3>🚨 Report: {dustbin.binId}</h3>
-        <p style={{ color: "#666", margin: "8px 0 16px" }}>
+        <p style={{ color: "#666", margin: "8px 0 8px" }}>
           {dustbin.street}, {dustbin.area}, {dustbin.city}
+        </p>
+        <p style={{ color: "#2e7d32", fontSize: 13, margin: "0 0 12px" }}>
+          🏅 Earn <strong>+10 Wise Citizen Points</strong> once verified by admin!
         </p>
         <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={3} required />
         <div className="modal-actions">
@@ -331,7 +571,7 @@ function ReportModal({ dustbin, onSubmit, onClose }) {
 /* ============================================================
    USER DASHBOARD
    ============================================================ */
-function UserDashboard({ dustbins, onRefresh }) {
+function UserDashboard({ user, dustbins, onRefresh }) {
   const [selectedDustbin, setSelectedDustbin] = useState(null);
   const [suggestion, setSuggestion] = useState(null);
   const [finding, setFinding] = useState(false);
@@ -340,14 +580,27 @@ function UserDashboard({ dustbins, onRefresh }) {
 
   const handleReport = async (dustbinId, message) => {
     try {
-      await fetch(API + "/reports", {
+      const token = localStorage.getItem("token");
+      const res = await fetch(API + "/reports", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dustbinId, message }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: "Bearer " + token } : {}),
+        },
+        body: JSON.stringify({
+          dustbinId,
+          message,
+          userId: user?._id || user?.id,
+        }),
       });
-      alert("✅ Report submitted!");
-      setSelectedDustbin(null);
-      onRefresh();
+      if (res.ok) {
+        alert("✅ Report submitted! You will receive 10 Wise Citizen Points once verified.");
+        setSelectedDustbin(null);
+        onRefresh();
+      } else {
+        const data = await res.json();
+        alert(data.message || "Failed to submit report");
+      }
     } catch (err) {
       alert("Failed to submit report");
     }
@@ -375,6 +628,8 @@ function UserDashboard({ dustbins, onRefresh }) {
 
   const available = dustbins.filter((b) => b.status === "Available").length;
   const full = dustbins.filter((b) => b.status === "Full").length;
+  const points = user?.points || 0;
+  const reward = getRewardInfo(points);
 
   const filtered = dustbins.filter((b) => {
     const term = searchTerm.toLowerCase();
@@ -394,7 +649,17 @@ function UserDashboard({ dustbins, onRefresh }) {
         <StatCard icon="🗑️" label="Total Dustbins" value={dustbins.length} color="#667eea" />
         <StatCard icon="🟢" label="Available" value={available} color="#4caf50" />
         <StatCard icon="🔴" label="Full" value={full} color="#ef5350" />
+        <StatCard
+          icon="🏅"
+          label={reward.discount > 0 ? `Wise Citizen (${reward.discount}% OFF)` : "Wise Citizen Points"}
+          value={points}
+          color="#f59e0b"
+        />
       </div>
+
+      {/* Wise Citizen Rewards */}
+{/* Wise Citizen Rewards */}
+<RewardsCard user={user} onRefresh={onRefresh} />
 
       {/* Map */}
       <div className="section-card">
@@ -533,6 +798,28 @@ function AdminDashboard({ dustbins, reports, onRefresh }) {
     } catch (err) { alert("Failed to update"); }
   };
 
+  const verifyReport = async (reportId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(API + "/reports/" + reportId + "/verify", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: "Bearer " + token } : {}),
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("✅ Report verified! +10 Wise Citizen Points awarded to the user.");
+        onRefresh();
+      } else {
+        alert(data.message || "Failed to verify report");
+      }
+    } catch (err) {
+      alert("Failed to verify report");
+    }
+  };
+
   const autoFill = () => {
     if (!navigator.geolocation) return alert("Geolocation not supported");
     navigator.geolocation.getCurrentPosition(
@@ -659,11 +946,21 @@ function AdminDashboard({ dustbins, reports, onRefresh }) {
                 <div className="report-header">
                   <span className="bin-id">{r.dustbinId?.binId || "N/A"}</span>
                   <span className={r.status === "Pending" ? "badge badge-pending" : "badge badge-resolved"}>
-                    {r.status === "Pending" ? "⏳ Pending" : "✅ Resolved"}
+                    {r.status === "Pending" ? "⏳ Pending" : r.status === "Verified" ? "✅ Verified (+10 pts)" : "✅ Resolved"}
                   </span>
                 </div>
                 <p className="report-message">💬 {r.message}</p>
+                {r.userId?.name && (
+                  <p className="report-date">👤 Reported by: <strong>{r.userId.name}</strong> ({r.userId.points || 0} pts)</p>
+                )}
                 <p className="report-date">🕐 {new Date(r.createdAt).toLocaleString()}</p>
+                {r.status === "Pending" && (
+                  <div style={{ marginTop: 10 }}>
+                    <button className="btn btn-success btn-small" onClick={() => verifyReport(r._id)}>
+                      ✅ Verify & Award +10 pts
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -687,6 +984,23 @@ function App() {
   const loadData = useCallback(() => {
     fetch(API + "/dustbins").then((r) => r.json()).then(setDustbins).catch(() => {});
     fetch(API + "/reports").then((r) => r.json()).then(setReports).catch(() => {});
+
+    // Keep logged-in user's Wise Citizen Points synced
+    const token = localStorage.getItem("token");
+    if (token) {
+      fetch(API + "/auth/me", {
+        headers: { Authorization: "Bearer " + token },
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data && (data._id || data.user)) {
+            const updatedUser = data.user || data;
+            setUser(updatedUser);
+            localStorage.setItem("user", JSON.stringify(updatedUser));
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   // Check for saved session
@@ -772,7 +1086,9 @@ function App() {
                 <div className="avatar">{user.name?.[0]?.toUpperCase() || "U"}</div>
                 <div>
                   <p className="user-name">{user.name}</p>
-                  <p className="user-role">{user.role === "admin" ? "🛡️ Admin" : "👤 User"}</p>
+                  <p className="user-role">
+                    {user.role === "admin" ? "🛡️ Admin" : `🏅 ${user.points || 0} pts`}
+                  </p>
                 </div>
               </div>
               <button className="btn btn-danger btn-small" onClick={logout}>🚪 Logout</button>
@@ -789,7 +1105,7 @@ function App() {
               <button className="btn btn-outline btn-small" onClick={loadData}>🔄 Refresh</button>
             </header>
 
-            {activeTab === "user" && <UserDashboard dustbins={dustbins} onRefresh={loadData} />}
+            {activeTab === "user" && <UserDashboard user={user} dustbins={dustbins} onRefresh={loadData} />}
             {activeTab === "admin" && <AdminDashboard dustbins={dustbins} reports={reports} onRefresh={loadData} />}
           </main>
         </div>
