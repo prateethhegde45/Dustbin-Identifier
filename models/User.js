@@ -24,6 +24,28 @@ const userSchema = new mongoose.Schema(
       default: "user"
     },
 
+    points: {
+      type: Number,
+      default: 0
+    },
+
+    redeemedCodes: [
+      {
+        code: {
+          type: String,
+          required: true
+        },
+        discount: {
+          type: Number,
+          required: true
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now
+        }
+      }
+    ],
+
     resetCode: {
       type: String,
       default: null
